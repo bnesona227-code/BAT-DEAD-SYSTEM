@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAT-DEAD-MAN // Command Center</title>
+<style>
+  :root {
+    --bg: #03060c;
+    --bg-gradient: radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.08), transparent 40%),
+                   radial-gradient(circle at 85% 85%, rgba(14, 165, 233, 0.06), transparent 45%);
+    --panel: rgba(10, 16, 29, 0.85);
+    --surface: #050912;
+    --border: rgba(56, 189, 248, 0.16);
+    --border-subtle: rgba(148, 163, 184, 0.12);
+    --neon: #38bdf8;
+    --neon-bright: #7dd3fc;
+    --neon-glow: rgba(56, 189, 248, 0.28);
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --success: #10b981;
+    --success-glow: rgba(16, 185, 129, 0.25);
+    --danger: #ef4444;
+    --danger-glow: rgba(239, 68, 68, 0.3);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg);
+    background-image: var(--bg-gradient);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh;
+    padding: 28px 24px 48px;
+  }
+  .container { max-width: 1080px; margin: 0 auto; }
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px; background: var(--panel); backdrop-filter: blur(12px);
+    border: 1px solid var(--border); border-radius: 16px; margin-bottom: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .shield-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.35);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--neon); box-shadow: 0 0 16px var(--neon-glow);
+  }
+  .brand-text h1 { font-size: 17px; font-weight: 800; letter-spacing: 1.8px; color: var(--text); }
+  .brand-text h1 span { color: var(--neon); }
+  .brand-text p { font-size: 11px; color: var(--muted); letter-spacing: 0.4px; margin-top: 2px; }
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle);
+    color: var(--text); padding: 9px 14px; border-radius: 10px;
+    font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-ghost:hover { border-color: var(--neon); color: var(--neon-bright); background: rgba(56, 189, 248, 0.07); }
+  .dashboard-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 22px; align-items: start; }
+  @media (max-width: 860px) { .dashboard-grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel); backdrop-filter: blur(12px);
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 22px; margin-bottom: 22px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  }
+  .card:last-child { margin-bottom: 0; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .card-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; color: var(--muted); }
+  .reactor-panel {
+    background: var(--surface); border: 1px solid var(--border-subtle);
+    border-radius: 14px; padding: 26px 16px 22px; text-align: center; margin-bottom: 18px;
+  }
+  .state-badge {
+    display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
+    background: rgba(148, 163, 184, 0.1); color: var(--muted);
+    border: 1px solid rgba(148, 163, 184, 0.2); margin-bottom: 14px;
+  }
+  .state-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .state-badge.armed { background: rgba(16, 185, 129, 0.12); color: var(--success); border-color: rgba(16, 185, 129, 0.35); }
+  .state-badge.armed .state-dot { background: var(--success); box-shadow: 0 0 10px var(--success); }
+  .state-badge.triggered { background: rgba(239, 68, 68, 0.15); color: var(--danger); border-color: rgba(239, 68, 68, 0.4); }
+  .state-badge.triggered .state-dot { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
+  .timer-digits {
+    font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+    font-size: 54px; font-weight: 800; letter-spacing: 4px; color: var(--text);
+    font-variant-numeric: tabular-nums; line-height: 1.1; margin-bottom: 16px;
+  }
+  .timer-digits.armed { color: #ffffff; text-shadow: 0 0 24px var(--neon-glow); }
+  .timer-digits.triggered { color: var(--danger); text-shadow: 0 0 24px var(--danger-glow); }
+  .progress-bar-wrap { width: 100%; height: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 99px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #0284c7, var(--neon)); transition: width 0.5s linear; }
+  .progress-bar-fill.armed { background: linear-gradient(90deg, #059669, var(--success)); }
+  .progress-bar-fill.triggered { background: var(--danger); width: 0%; }
+  .input-group { margin-bottom: 12px; }
+  .field {
+    width: 100%; background: var(--surface); border: 1px solid var(--border-subtle);
+    color: var(--text); padding: 12px 14px; border-radius: 10px; font-size: 13px; outline: none;
+  }
+  .field:focus { border-color: var(--neon); box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14); }
+  .btn-row { display: grid; grid-template-columns: 1.4fr 1fr 0.8fr; gap: 10px; margin-bottom: 10px; }
+  .btn-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .btn {
+    padding: 11px 14px; border-radius: 10px; font-size: 13px; font-weight: 700;
+    cursor: pointer; border: none; transition: all 0.18s;
+  }
+  .btn-checkin { background: var(--success); color: #022c22; }
+  .btn-checkin:hover { box-shadow: 0 0 18px var(--success-glow); }
+  .btn-neon { background: var(--neon); color: #030712; }
+  .btn-neon:hover { background: var(--neon-bright); box-shadow: 0 0 18px var(--neon-glow); }
+  .btn-muted { background: rgba(255, 255, 255, 0.06); color: var(--text); border: 1px solid var(--border-subtle); }
+  .btn-recover { width: 100%; background: linear-gradient(90deg, #0284c7, var(--neon)); color: #030712; margin-bottom: 10px; padding: 13px; }
+  .btn-panic {
+    width: 100%; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.45);
+    color: #fca5a5; padding: 11px; letter-spacing: 0.8px;
+  }
+  .btn-panic:hover { background: var(--danger); color: #ffffff; box-shadow: 0 0 22px var(--danger-glow); }
+  .toggle-row { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); margin: 12px 0 14px; cursor: pointer; }
+  .toggle-row input { width: 16px; height: 16px; accent-color: var(--neon); }
+  .dropzone {
+    border: 1.5px dashed rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.03);
+    border-radius: 12px; padding: 16px; text-align: center; font-size: 12px; color: var(--muted);
+    cursor: pointer; margin-bottom: 14px; transition: 0.2s;
+  }
+  .dropzone:hover, .dropzone.dragover { border-color: var(--neon); background: rgba(56, 189, 248, 0.09); color: var(--text); }
+  .dropzone strong { color: var(--neon); }
+  .vault-list { display: flex; flex-direction: column; gap: 8px; max-height: 230px; overflow-y: auto; }
+  .vault-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 12px; background: var(--surface); border: 1px solid var(--border-subtle);
+    border-radius: 10px; font-size: 12px;
+  }
+  .vault-name { font-weight: 600; color: var(--text); word-break: break-all; }
+  .vault-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .vault-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .pill-enc { padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+  .pill-open { padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; background: rgba(16, 185, 129, 0.12); color: #6ee7b7; }
+  .btn-shred-mini { background: none; border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; border-radius: 6px; padding: 3px 7px; font-size: 11px; cursor: pointer; }
+  .btn-shred-mini:hover { background: var(--danger); color: #fff; }
+  .terminal-log {
+    background: #020408; border: 1px solid var(--border-subtle); border-radius: 12px;
+    padding: 12px 14px; height: 240px; overflow-y: auto;
+    font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace; font-size: 11px; line-height: 1.65; color: var(--muted);
+  }
+  .log-entry { padding: 2px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.03); }
+  .log-entry.alert { color: #f87171; font-weight: 700; }
+  .log-entry.sec { color: var(--neon); }
+  .log-entry.ok { color: #34d399; }
+  .log-entry.warn { color: #fbbf24; }
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: #0f172a; border: 1px solid var(--neon);
+    color: var(--text); padding: 12px 18px; border-radius: 12px; font-size: 13px; font-weight: 600;
+    opacity: 0; transform: translateY(12px); pointer-events: none; transition: all 0.25s; z-index: 999;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { border-color: var(--danger); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="topbar">
+    <div class="brand">
+      <div class="shield-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>BAT<span>-DEAD-</span>MAN</h1>
+        <p>Автономный протокол защиты и шифрования данных</p>
+      </div>
+    </div>
+    <button class="btn-ghost" onclick="openVault()">📁 Открыть папку сейфа</button>
+  </header>
+
+  <div class="dashboard-grid">
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Контроль присутствия</div>
+          <span id="intervalBadge" style="font-size:11px; color:var(--neon); font-weight:600;">Интервал: —</span>
+        </div>
+        <div class="reactor-panel">
+          <div class="state-badge" id="stateBadge">
+            <span class="state-dot"></span>
+            <span id="stateLabel">STANDBY // ОЖИДАНИЕ</span>
+          </div>
+          <div class="timer-digits" id="timerDigits">00:00:00</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="progressBar"></div>
+          </div>
+        </div>
+        <div class="input-group">
+          <input type="password" id="actionPin" class="field" placeholder="Введите PIN-код для управления..." onkeydown="if(event.key==='Enter') handlePrimaryAction()">
+        </div>
+        <div id="recoverBox" style="display:none;">
+          <button class="btn btn-recover" onclick="sendAction('/api/recover')">🔓 Расшифровать сейф по PIN-коду</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-checkin" onclick="sendAction('/api/checkin')">✓ ЧЕК-ИН</button>
+          <button class="btn btn-neon" onclick="sendAction('/api/arm')">▶ Старт</button>
+          <button class="btn btn-muted" onclick="sendAction('/api/disarm')">⏹ Стоп</button>
+        </div>
+        <button class="btn btn-panic" onclick="triggerPanic()">🚨 ЭКСТРЕННАЯ БЛОКИРОВКА (PANIC)</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Параметры безопасности</div></div>
+        <div class="input-group" id="oldPinGroup" style="display:none;">
+          <input type="password" id="oldPinInput" class="field" placeholder="Текущий PIN-код (для подтверждения)">
+        </div>
+        <div class="btn-row-2">
+          <input type="password" id="newPinInput" class="field" placeholder="Новый PIN (от 4 символов)">
+          <select id="intervalSelect" class="field">
+            <option value="15">15 секунд (Быстрый тест)</option>
+            <option value="60">1 минута (Тест)</option>
+            <option value="900">15 минут</option>
+            <option value="3600" selected>1 час</option>
+            <option value="21600">6 часов</option>
+            <option value="86400">24 часа</option>
+          </select>
+        </div>
+        <label class="toggle-row">
+          <input type="checkbox" id="lockScreenChk">
+          <span>Блокировать экран macOS / Windows при срабатывании тревоги</span>
+        </label>
+        <button class="btn btn-neon" style="width:100%" onclick="saveSetup()">Сохранить настройки</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Защищённый сейф (vault_safe)</div>
+          <span id="fileCountBadge" style="font-size:11px; color:var(--muted);">0 файлов</span>
+        </div>
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('filePicker').click()">
+          Перетащите файлы сюда или <strong>выберите на диске</strong>, чтобы поместить в сейф
+          <input type="file" id="filePicker" multiple style="display:none" onchange="uploadFiles(this.files)">
+        </div>
+        <div class="vault-list" id="vaultList"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Журнал событий безопасности</div></div>
+        <div class="terminal-log" id="logBox"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let isArmed = false;
+  let isTriggered = false;
+
+  function showToast(msg, isError = false) {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.className = 'toast show' + (isError ? ' error' : '');
+    setTimeout(() => { t.className = 'toast'; }, 3200);
+  }
+  function formatTime(sec) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+  }
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  }
+  function handlePrimaryAction() {
+    if (isTriggered) return sendAction('/api/recover');
+    if (isArmed) return sendAction('/api/checkin');
+    return sendAction('/api/arm');
+  }
+  async function saveSetup() {
+    const pin = document.getElementById('newPinInput').value.trim();
+    const old_pin = document.getElementById('oldPinInput').value.trim();
+    const interval_seconds = parseInt(document.getElementById('intervalSelect').value, 10);
+    const lock_screen_on_trigger = document.getElementById('lockScreenChk').checked;
+    const res = await fetch('/api/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, old_pin, interval_seconds, lock_screen_on_trigger })
+    });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.detail || 'Ошибка сохранения', true);
+    document.getElementById('newPinInput').value = '';
+    document.getElementById('oldPinInput').value = '';
+    showToast('Параметры безопасности сохранены');
+    refreshStatus();
+  }
+  async function sendAction(endpoint) {
+    const pin = document.getElementById('actionPin').value.trim();
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin })
+    });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.detail || 'Ошибка', true);
+    document.getElementById('actionPin').value = '';
+    if (endpoint === '/api/checkin') showToast('Чек-ин подтверждён — таймер сброшен');
+    if (endpoint === '/api/arm') showToast('Таймер запущен');
+    if (endpoint === '/api/disarm') showToast('Охрана снята');
+    if (endpoint === '/api/recover') showToast('Файлы успешно расшифрованы');
+    refreshStatus();
+  }
+  async function triggerPanic() {
+    if (!confirm('Зашифровать все файлы в сейфе и затереть оригиналы прямо сейчас?')) return;
+    await fetch('/api/panic', { method: 'POST', body: '{}' });
+    showToast('АКТИВИРОВАН ПРОТОКОЛ ТРЕВОГИ', true);
+    refreshStatus();
+  }
+  async function openVault() { await fetch('/api/open-vault', { method: 'POST', body: '{}' }); }
+  async function shredOne(filename) {
+    if (!confirm(`Безвозвратно затереть файл "${filename}" без возможности восстановления?`)) return;
+    await fetch('/api/shred-one', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename })
+    });
+    showToast(`Файл ${filename} уничтожен`);
+    refreshStatus();
+  }
+  async function uploadFiles(fileList) {
+    for (const file of fileList) {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const b64 = reader.result.split(',')[1];
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, content_b64: b64 })
+        });
+        if (res.ok) { showToast(`Файл добавлен в сейф: ${file.name}`); refreshStatus(); }
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+  const dz = document.getElementById('dropzone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
+  function escapeHtml(s) { return s.replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m])); }
+  async function refreshStatus() {
+    try {
+      const res = await fetch('/api/status');
+      const st = await res.json();
+      isArmed = st.armed; isTriggered = st.triggered;
+      document.getElementById('oldPinGroup').style.display = st.has_pin ? 'block' : 'none';
+      document.getElementById('recoverBox').style.display = st.triggered ? 'block' : 'none';
+      document.getElementById('intervalBadge').innerText = `Интервал: ${formatTime(st.interval_seconds)}`;
+      document.getElementById('fileCountBadge').innerText = `${st.files.length} файл(ов)`;
+      const badge = document.getElementById('stateBadge'), label = document.getElementById('stateLabel'), digits = document.getElementById('timerDigits'), bar = document.getElementById('progressBar');
+      badge.className = 'state-badge'; digits.className = 'timer-digits'; bar.className = 'progress-bar-fill';
+      if (st.triggered) {
+        badge.classList.add('triggered'); digits.classList.add('triggered'); bar.classList.add('triggered');
+        label.innerText = 'LOCKED // СЕЙФ ЗАШИФРОВАН'; digits.innerText = '00:00:00';
+      } else if (st.armed) {
+        badge.classList.add('armed'); digits.classList.add('armed'); bar.classList.add('armed');
+        label.innerText = 'ARMED // ТАЙМЕР АКТИВЕН'; digits.innerText = formatTime(st.remaining_seconds);
+        bar.style.width = Math.max(0, Math.min(100, (st.remaining_seconds / st.interval_seconds) * 100)) + '%';
+      } else {
+        label.innerText = st.has_pin ? 'STANDBY // ГОТОВ К ЗАПУСКУ' : 'SETUP // ЗАДАЙТЕ PIN-КОД';
+        digits.innerText = formatTime(st.interval_seconds); bar.style.width = '100%';
+      }
+      const listEl = document.getElementById('vaultList');
+      if (st.files.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center; padding:20px; font-size:12px; color:var(--muted);">В сейфе пока пусто. Перетащите файл выше или откройте папку vault_safe.</div>';
+      } else {
+        listEl.innerHTML = st.files.map(f => `
+          <div class="vault-item">
+            <div><div class="vault-name">${escapeHtml(f.name)}</div><div class="vault-meta">${formatSize(f.size)} • ${f.mtime}</div></div>
+            <div class="vault-right">
+              <span class="${f.encrypted ? 'pill-enc' : 'pill-open'}">${f.encrypted ? '🔒 ENCRYPTED' : '✓ OPEN'}</span>
+              <button class="btn-shred-mini" title="Безвозвратно затереть" onclick="shredOne('${escapeHtml(f.name)}')">✕</button>
+            </div>
+          </div>
+        `).join('');
+      }
+      const logBox = document.getElementById('logBox');
+      logBox.innerHTML = st.logs.map(line => {
+        let cls = 'log-entry';
+        if (line.includes('[ALERT]')) cls += ' alert';
+        else if (line.includes('[SEC]')) cls += ' sec';
+        else if (line.includes('[OK]')) cls += ' ok';
+        else if (line.includes('[WARN]')) cls += ' warn';
+        return `<div class="${cls}">${escapeHtml(line)}</div>`;
+      }).join('');
+    } catch (e) {}
+  }
+  refreshStatus();
+  setInterval(refreshStatus, 1000);
+</script>
+</body>
+</html>
